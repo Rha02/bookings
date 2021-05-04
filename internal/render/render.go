@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"path/filepath"
 
-	"github.com/Rha02/bookings-app/internal/config"
-	"github.com/Rha02/bookings-app/internal/models"
+	"github.com/Rha02/bookings/internal/config"
+	"github.com/Rha02/bookings/internal/models"
 	"github.com/justinas/nosurf"
 )
 
@@ -41,7 +41,7 @@ func Template(rw http.ResponseWriter, r *http.Request, tmpl string, td *models.T
 
 	t, ok := tc[tmpl]
 	if !ok {
-		return errors.New("Can't get template from cache")
+		return errors.New("сan't get template from cache")
 	}
 
 	buf := new(bytes.Buffer)

@@ -7,14 +7,14 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Rha02/bookings-app/internal/config"
-	"github.com/Rha02/bookings-app/internal/driver"
-	"github.com/Rha02/bookings-app/internal/forms"
-	"github.com/Rha02/bookings-app/internal/helpers"
-	"github.com/Rha02/bookings-app/internal/models"
-	"github.com/Rha02/bookings-app/internal/render"
-	"github.com/Rha02/bookings-app/internal/repository"
-	"github.com/Rha02/bookings-app/internal/repository/dbrepo"
+	"github.com/Rha02/bookings/internal/config"
+	"github.com/Rha02/bookings/internal/driver"
+	"github.com/Rha02/bookings/internal/forms"
+	"github.com/Rha02/bookings/internal/helpers"
+	"github.com/Rha02/bookings/internal/models"
+	"github.com/Rha02/bookings/internal/render"
+	"github.com/Rha02/bookings/internal/repository"
+	"github.com/Rha02/bookings/internal/repository/dbrepo"
 	"github.com/go-chi/chi/v5"
 )
 

@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Rha02/bookings-app/internal/config"
-	"github.com/Rha02/bookings-app/internal/models"
-	"github.com/Rha02/bookings-app/internal/render"
+	"github.com/Rha02/bookings/internal/config"
+	"github.com/Rha02/bookings/internal/models"
+	"github.com/Rha02/bookings/internal/render"
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"

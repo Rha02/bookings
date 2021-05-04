@@ -1,4 +1,4 @@
-module github.com/Rha02/bookings-app
+module github.com/Rha02/bookings
 
 go 1.16
 

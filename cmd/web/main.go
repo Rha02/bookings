@@ -8,12 +8,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/Rha02/bookings-app/internal/config"
-	"github.com/Rha02/bookings-app/internal/driver"
-	"github.com/Rha02/bookings-app/internal/handlers"
-	"github.com/Rha02/bookings-app/internal/helpers"
-	"github.com/Rha02/bookings-app/internal/models"
-	"github.com/Rha02/bookings-app/internal/render"
+	"github.com/Rha02/bookings/internal/config"
+	"github.com/Rha02/bookings/internal/driver"
+	"github.com/Rha02/bookings/internal/handlers"
+	"github.com/Rha02/bookings/internal/helpers"
+	"github.com/Rha02/bookings/internal/models"
+	"github.com/Rha02/bookings/internal/render"
 	"github.com/alexedwards/scs/v2"
 )
 

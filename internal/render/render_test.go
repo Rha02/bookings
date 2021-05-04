@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/Rha02/bookings-app/internal/models"
+	"github.com/Rha02/bookings/internal/models"
 )
 
 func TestAddDefaultData(t *testing.T) {

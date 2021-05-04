@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"runtime/debug"
 
-	"github.com/Rha02/bookings-app/internal/config"
+	"github.com/Rha02/bookings/internal/config"
 )
 
 var app *config.AppConfig

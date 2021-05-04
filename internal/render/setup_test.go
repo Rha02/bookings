@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Rha02/bookings-app/internal/config"
-	"github.com/Rha02/bookings-app/internal/models"
+	"github.com/Rha02/bookings/internal/config"
+	"github.com/Rha02/bookings/internal/models"
 	"github.com/alexedwards/scs/v2"
 )
 
