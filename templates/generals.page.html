@@ -34,10 +34,6 @@
 {{define "js"}}
 <script>
     document.getElementById("check-availability-btn").addEventListener("click", () => {
-        // notify("This is my message", "success")
-        // notifyModal("title", "<em>Kachigga</em>", "info", "Kachow")
-        // attention.toast({ msg: "Hello World" })
-        // attention.success({ msg: "Kachigga" })
         let html = `
                 <form id="check-availability-form" action="" method="POST" novalidate class="needs-validation">
                     <div class="row">
@@ -60,8 +56,9 @@
             willOpen: () => {
                 const elem = document.getElementById("reservation-dates-modal");
                 const rp = new DateRangePicker(elem, {
-                    format: 'dd-mm-yyyy',
-                    showOnFocus: true
+                    format: 'mm-dd-yyyy',
+                    showOnFocus: true,
+                    minDate: new Date(),
                 });
             },
             didOpen: () => {
@@ -72,6 +69,7 @@
                 let form = document.getElementById("check-availability-form");
                 let formData = new FormData(form);
                 formData.append("csrf_token", "{{.CSRFToken}}");
+                formData.append("room_id", "1")
 
                 fetch('/search-availability-json', {
                     method: "post",
@@ -79,7 +77,27 @@
                 })
                     .then(res => res.json())
                     .then(data => {
-                        console.log(data)
+                        if (data.ok) {
+                            attention.custom({
+                                icon: "success",
+                                msg: '<p>Room is available</p>'
+                                    + '<p><a href="/book-room?id=' 
+                                    + data.room_id 
+                                    + '&s='
+                                    + data.start_date
+                                    + '&e=' 
+                                    + data.end_date
+                                    + '" class="btn btn-primary">Book Now!</a></p>',
+                                showConfirmButton: false,
+                            })
+                        } else {
+                            console.log("room is not available")
+                            attention.custom({
+                                icon: "error", 
+                                msg: '<p>Room is not available</p>',
+                                showConfirmButton: false,
+                            })
+                        }
                     })
             }
         })

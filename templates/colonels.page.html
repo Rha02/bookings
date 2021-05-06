@@ -4,7 +4,8 @@
 <div class="container">
     <div class="row">
         <div class="col">
-            <img src="static/images/colonels-suite.png" alt="Room Image" class="img-fluid img-thumbnail mx-auto d-block room-image">
+            <img src="static/images/colonels-suite.png" alt="Room Image" 
+            class="img-fluid img-thumbnail mx-auto d-block room-image">
         </div>
     </div>
     <div class="row">
@@ -29,10 +30,6 @@
 {{define "js"}}
 <script>
     document.getElementById("check-availability-btn").addEventListener("click", () => {
-        // notify("This is my message", "success")
-        // notifyModal("title", "<em>Kachigga</em>", "info", "Kachow")
-        // attention.toast({ msg: "Hello World" })
-        // attention.success({ msg: "Kachigga" })
         let html = `
                 <form id="check-availability-form" action="" method="POST" novalidate class="needs-validation">
                     <div class="row">
@@ -49,7 +46,57 @@
                     </div>
                 </form>
             `
-        attention.custom({ msg: html })
+        attention.custom({ 
+            msg: html,
+            title: "Choose your dates",
+            willOpen: () => {
+                const elem = document.getElementById("reservation-dates-modal");
+                const rp = new DateRangePicker(elem, {
+                    format: 'mm-dd-yyyy',
+                    showOnFocus: true,
+                    minDate: new Date(),
+                });
+            },
+            didOpen: () => {
+                document.getElementById('start').removeAttribute('disabled');
+                document.getElementById('end').removeAttribute('disabled');
+            },
+            callback: (result) => {
+                let form = document.getElementById("check-availability-form");
+                let formData = new FormData(form);
+                formData.append("csrf_token", "{{.CSRFToken}}");
+                formData.append("room_id", "2")
+
+                fetch('/search-availability-json', {
+                    method: "post",
+                    body: formData
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.ok) {
+                            attention.custom({
+                                icon: "success",
+                                msg: '<p>Room is available</p>'
+                                    + '<p><a href="/book-room?id=' 
+                                    + data.room_id 
+                                    + '&s='
+                                    + data.start_date
+                                    + '&e=' 
+                                    + data.end_date
+                                    + '" class="btn btn-primary">Book Now!</a></p>',
+                                showConfirmButton: false,
+                            })
+                        } else {
+                            console.log("room is not available")
+                            attention.custom({
+                                icon: "error", 
+                                msg: '<p>Room is not available</p>',
+                                showConfirmButton: false,
+                            })
+                        }
+                    })
+            }
+        })
     });
 </script>
 {{end}}
