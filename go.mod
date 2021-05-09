@@ -10,4 +10,5 @@ require (
 	github.com/jackc/pgconn v1.8.1 // indirect
 	github.com/jackc/pgx/v4 v4.11.0 // indirect
 	github.com/justinas/nosurf v1.1.1
+	github.com/xhit/go-simple-mail/v2 v2.9.0 // indirect
 )
