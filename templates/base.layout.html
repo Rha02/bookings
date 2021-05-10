@@ -48,6 +48,13 @@
                     <li class="nav-item">
                         <a class="nav-link" href="/contact" tabindex="-1" aria-disabled="true">Contact</a>
                     </li>
+                    <li class="nav-item">
+                        {{if eq .IsAuthenticated 1}}
+                            <a class="nav-link" href="/logout" tabindex="-1" aria-disabled="true">Logout</a>
+                        {{else}}
+                            <a class="nav-link" href="/login" tabindex="-1" aria-disabled="true">Login</a>
+                        {{end}}
+                    </li>
                 </ul>
             </div>
         </div>

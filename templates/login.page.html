@@ -1,0 +1,38 @@
+{{ template "base" . }}
+
+{{ define "content" }}
+    <div class="container">
+        <div class="row">
+            <div class="col">
+                <h1>Login</h1>
+
+                <form action="/login" method="POST" novalidate>
+                    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        {{with .Form.Errors.Get "email"}}
+                            <label for="" class="text-danger">{{.}}</label>
+                        {{end}}
+                        <input type="email" class="form-control {{with .Form.Errors.Get "email"}} is-invalid {{end}}" 
+                            id="email" name="email" value=""
+                            autocomplete="off" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="password" class="form-label">password</label>
+                        {{with .Form.Errors.Get "password"}}
+                            <label for="" class="text-danger">{{.}}</label>
+                        {{end}}
+                        <input type="password" class="form-control {{with .Form.Errors.Get "password"}} is-invalid {{end}}" 
+                            id="password" name="password" value=""
+                            autocomplete="off" required>
+                    </div>
+
+                    <hr>
+
+                    <input type="submit" class="btn btn-primary" value="Submit">
+                </form>
+            </div>
+        </div>
+    </div>
+{{ end }}

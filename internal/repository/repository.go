@@ -8,6 +8,10 @@ import (
 
 type DatabaseRepo interface {
 	AllUsers() bool
+	GetUserByID(id int) (models.User, error)
+	UpdateUser(u models.User) error
+
+	Authenticate(email, testPassword string) (int, string, error)
 
 	InsertReservation(res models.Reservation) (int, error)
 	InsertRoomRestriction(r models.RoomRestriction) error
