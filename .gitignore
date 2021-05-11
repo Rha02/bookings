@@ -4,4 +4,4 @@ coverage.out
 bookings
 schema.sql
 .idea
-run.sh
+.DS_Store

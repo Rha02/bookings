@@ -1,0 +1,96 @@
+{{template "admin" .}}
+
+{{define "page-title"}}
+    Reservation
+{{end}}
+
+{{define "content"}}
+    {{$res := index .Data "reservation"}}
+    {{$src := index .StringMap "src"}}
+    <div class="col-md-12">
+        <p><strong>Arrival:</strong> {{humanDate $res.StartDate}}</p>
+        <p><strong>Departure:</strong> {{humanDate $res.EndDate}}</p>
+        <p><strong>Room:</strong> {{$res.Room.RoomName}}</p>
+
+        <form action="/admin/reservations/{{$src}}/{{$res.ID}}" method="POST" class="" novalidate>
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+            <div class="mb-3">
+                <label for="first_name" class="form-label">First Name</label>
+                {{with .Form.Errors.Get "first_name"}}
+                    <label for="" class="text-danger">{{.}}</label>
+                {{end}}
+                <input type="text" class="form-control {{with .Form.Errors.Get "first_name"}} is-invalid {{end}}" 
+                    id="first_name" name="first_name" value="{{$res.FirstName}}"
+                    autocomplete="off" required>
+            </div>
+            <div class="mb-3">
+                <label for="last_name" class="form-label">Last Name</label>
+                {{with .Form.Errors.Get "last_name"}}
+                    <label for="" class="text-danger">{{.}}</label>
+                {{end}}
+                <input type="text" class="form-control {{with .Form.Errors.Get "last_name"}} is-invalid {{end}}" 
+                    id="last_name" name="last_name" value="{{$res.LastName}}"
+                    autocomplete="off" required>
+            </div>  
+            <div class="mb-3">
+                <label for="email" class="form-label">Email</label>
+                {{with .Form.Errors.Get "email"}}
+                    <label for="" class="text-danger">{{.}}</label>
+                {{end}}
+                <input type="email" class="form-control {{with .Form.Errors.Get "email"}} is-invalid {{end}}" 
+                id="email" name="email" value="{{$res.Email}}"
+                autocomplete="off" required>
+            </div>
+            <div class="mb-3">
+                <label for="phone" class="form-label">Phone Number</label>
+                {{with .Form.Errors.Get "phone"}}
+                    <label for="" class="text-danger">{{.}}</label>
+                {{end}}
+                <input type="text" class="form-control {{with .Form.Errors.Get "phone"}} is-invalid {{end}}" 
+                id="phone" name="phone" value="{{$res.Phone}}"
+                autocomplete="off" required>
+            </div>
+
+            <hr>
+
+            <div class="float-left">
+                <input type="submit" class="btn btn-primary" value="Save">
+                <a href="/admin/reservations-{{$src}}" class="btn btn-warning">Cancel</a>
+                <a href="#!" class="btn btn-info" onclick="processRes({{$res.ID}})">Mark as Processed</a>
+            </div>
+            <div class="float-right">
+                <a href="#!" class="btn btn-danger" onclick="deleteRes({{$res.ID}})">Delete</a>
+            </div>
+            <div class="clearfix"></div>
+        </form>
+    </div>
+{{end}}
+
+{{define "js"}}
+{{$src := index .StringMap "src"}}
+<script>
+    function processRes(id) {
+        attention.custom({
+            icon: "warning",
+            msg: "Are you sure?",
+            callback: result => {
+                if (result !== false) {
+                    window.location.href = "/admin/process-reservation/{{$src}}/" + id
+                }
+            }
+        })
+    }
+
+    function deleteRes(id) {
+        attention.custom({
+            icon: "warning",
+            msg: "Are you sure?",
+            callback: result => {
+                if (result !== false) {
+                    window.location.href = "/admin/delete-reservation/{{$src}}/" + id
+                }
+            }
+        })
+    }
+</script>
+{{end}}

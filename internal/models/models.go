@@ -38,6 +38,7 @@ type Reservation struct {
 	Phone     string
 	StartDate time.Time
 	EndDate   time.Time
+	Processed int
 	RoomID    int
 	CreatedAt time.Time
 	UpdatedAt time.Time

@@ -50,7 +50,16 @@
                     </li>
                     <li class="nav-item">
                         {{if eq .IsAuthenticated 1}}
-                            <a class="nav-link" href="/logout" tabindex="-1" aria-disabled="true">Logout</a>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button"
+                                    data-bs-toggle="dropdown" aria-expanded="false">
+                                    Admin
+                                </a>
+                                <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                                    <li><a class="dropdown-item" href="/admin/dashboard">Dashboard</a></li>
+                                    <li><a class="dropdown-item" href="/logout">Logout</a></li>
+                                </ul>
+                            </li>
                         {{else}}
                             <a class="nav-link" href="/login" tabindex="-1" aria-disabled="true">Login</a>
                         {{end}}
@@ -111,7 +120,20 @@
                 html: text,
                 icon: icon,
                 confirmButtonText: confirmButtonText,
-            })}
+            })
+        }
+        
+        {{with .Error}}
+        notify("{{.}}", "error")
+        {{end}}
+
+        {{with .Flash}}
+        notify("{{.}}", "success")
+        {{end}}
+
+        {{with .Warning}}
+        notify("{{.}}", "warning")
+        {{end}}
     </script>
 </html>
 </body>

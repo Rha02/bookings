@@ -12,10 +12,12 @@ import (
 	"github.com/Rha02/bookings/internal/config"
 	"github.com/Rha02/bookings/internal/driver"
 	"github.com/Rha02/bookings/internal/forms"
+	"github.com/Rha02/bookings/internal/helpers"
 	"github.com/Rha02/bookings/internal/models"
 	"github.com/Rha02/bookings/internal/render"
 	"github.com/Rha02/bookings/internal/repository"
 	"github.com/Rha02/bookings/internal/repository/dbrepo"
+	"github.com/go-chi/chi/v5"
 )
 
 //Repo the repository used by the handlers
@@ -495,4 +497,135 @@ func (m *Repository) Logout(rw http.ResponseWriter, r *http.Request) {
 
 func (m *Repository) AdminDashboard(rw http.ResponseWriter, r *http.Request) {
 	render.Template(rw, r, "admin-dashboard.page.html", &models.TemplateData{})
+}
+
+//AdminNewReservations shows all new reservations in admin tool
+func (m *Repository) AdminNewReservations(rw http.ResponseWriter, r *http.Request) {
+	reservations, err := m.DB.AllNewReservations()
+	if err != nil {
+		helpers.ServerError(rw, err)
+		return
+	}
+
+	data := make(map[string]interface{})
+	data["reservations"] = reservations
+
+	render.Template(rw, r, "admin-new-reservations.page.html", &models.TemplateData{
+		Data: data,
+	})
+}
+
+//AdminAllReservations shows all reservations that were processed
+func (m *Repository) AdminAllReservations(rw http.ResponseWriter, r *http.Request) {
+	reservations, err := m.DB.AllReservations()
+	if err != nil {
+		helpers.ServerError(rw, err)
+		return
+	}
+
+	data := make(map[string]interface{})
+	data["reservations"] = reservations
+
+	render.Template(rw, r, "admin-all-reservations.page.html", &models.TemplateData{
+		Data: data,
+	})
+}
+
+func (m *Repository) AdminReservationsCalendar(rw http.ResponseWriter, r *http.Request) {
+	render.Template(rw, r, "admin-reservations-calendar.page.html", &models.TemplateData{})
+}
+
+//AdminShowReservation shows the reservation in the admin tool
+func (m *Repository) AdminShowReservation(rw http.ResponseWriter, r *http.Request) {
+	exploded := strings.Split(r.RequestURI, "/")
+
+	id, err := strconv.Atoi(exploded[4])
+	if err != nil {
+		helpers.ServerError(rw, err)
+		return
+	}
+
+	src := exploded[3]
+
+	stringMap := make(map[string]string)
+	stringMap["src"] = src
+
+	res, err := m.DB.GetReservationByID(id)
+	if err != nil {
+		helpers.ServerError(rw, err)
+		return
+	}
+
+	data := make(map[string]interface{})
+	data["reservation"] = res
+
+	render.Template(rw, r, "admin-reservation-show.page.html", &models.TemplateData{
+		Data:      data,
+		StringMap: stringMap,
+		Form:      forms.New(nil),
+	})
+}
+
+func (m *Repository) AdminPostShowReservation(rw http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		helpers.ServerError(rw, err)
+		return
+	}
+
+	exploded := strings.Split(r.RequestURI, "/")
+
+	id, err := strconv.Atoi(exploded[4])
+	if err != nil {
+		helpers.ServerError(rw, err)
+		return
+	}
+
+	src := exploded[3]
+
+	stringMap := make(map[string]string)
+	stringMap["src"] = src
+
+	res, err := m.DB.GetReservationByID(id)
+	if err != nil {
+		helpers.ServerError(rw, err)
+		return
+	}
+
+	res.FirstName = r.Form.Get("first_name")
+	res.LastName = r.Form.Get("last_name")
+	res.Email = r.Form.Get("email")
+	res.Phone = r.Form.Get("phone")
+
+	err = m.DB.UpdateReservation(res)
+	if err != nil {
+		helpers.ServerError(rw, err)
+		return
+	}
+
+	m.App.Session.Put(r.Context(), "flash", "Changes saved")
+	http.Redirect(rw, r, fmt.Sprintf("/admin/reservations-%s", src), http.StatusSeeOther)
+}
+
+//AdminProcessReservation marks a reservation as processed
+func (m *Repository) AdminProcessReservation(rw http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.Atoi(chi.URLParam(r, "id"))
+	src := chi.URLParam(r, "src")
+
+	m.DB.UpdateProcessedForReservation(id, 1)
+
+	m.App.Session.Put(r.Context(), "flash", "Reservation marked as processed")
+
+	http.Redirect(rw, r, fmt.Sprintf("/admin/reservations-%s", src), http.StatusSeeOther)
+}
+
+func (m *Repository) AdminDeleteReservation(rw http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.Atoi(chi.URLParam(r, "id"))
+	src := chi.URLParam(r, "src")
+
+	m.DB.DeleteReservation(id)
+
+	m.App.Session.Put(r.Context(), "flash", "Reservation deleted")
+
+	http.Redirect(rw, r, fmt.Sprintf("/admin/reservations-%s", src), http.StatusSeeOther)
 }
