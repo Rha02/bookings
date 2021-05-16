@@ -3,8 +3,8 @@
 {{ define "content" }}
     <div class="container">
         <div class="row">
-            <div class="col">
-                <h1>Login</h1>
+            <div class="col-md-8 offset-2">
+                <h1 class="mt-1">Login</h1>
 
                 <form action="/login" method="POST" novalidate>
                     <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
