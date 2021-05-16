@@ -13,7 +13,7 @@ func (m *testDBRepo) AllUsers() bool {
 }
 
 func (m *testDBRepo) InsertReservation(res models.Reservation) (int, error) {
-	if res.RoomID == 2 {
+	if res.RoomID == 3 {
 		return 0, errors.New("this is a false error")
 	}
 	return 1, nil
@@ -30,7 +30,6 @@ func (m *testDBRepo) InsertRoomRestriction(r models.RoomRestriction) error {
 func (m *testDBRepo) CheckAvailabilityByDatesByRoomID(start, end time.Time, roomID int) (bool, error) {
 	log.Println(roomID)
 	if roomID == 100 {
-		log.Println("kachow again")
 		return false, errors.New("some error")
 	}
 	return false, nil
@@ -65,7 +64,7 @@ func (m *testDBRepo) SearchAvailabilityForAllRooms(start, end time.Time) ([]mode
 func (m *testDBRepo) GetRoomByID(id int) (models.Room, error) {
 	var room models.Room
 
-	if id > 2 {
+	if id == 2 {
 		return room, errors.New("some error")
 	}
 
@@ -83,6 +82,9 @@ func (m *testDBRepo) UpdateUser(u models.User) error {
 }
 
 func (m *testDBRepo) Authenticate(email, testPassword string) (int, string, error) {
+	if email == "invalid@invalid.loc" {
+		return 0, "", errors.New("some error")
+	}
 	return 1, "", nil
 }
 
@@ -120,11 +122,16 @@ func (m *testDBRepo) UpdateProcessedForReservation(id, processed int) error {
 func (m *testDBRepo) AllRooms() ([]models.Room, error) {
 	var rooms []models.Room
 
+	rooms = append(rooms, models.Room{ID: 1})
+
 	return rooms, nil
 }
 
 func (m *testDBRepo) GetRestrictionsForRoomByDate(roomID int, start, end time.Time) ([]models.RoomRestriction, error) {
 	var restrictions []models.RoomRestriction
+
+	restrictions = append(restrictions, models.RoomRestriction{ReservationID: 1})
+	restrictions = append(restrictions, models.RoomRestriction{})
 
 	return restrictions, nil
 }

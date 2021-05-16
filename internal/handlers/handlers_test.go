@@ -29,21 +29,13 @@ var theTests = []struct {
 	{"cs", "/colonels-suite", "GET", 200},
 	{"sa", "/search-availability", "GET", 200},
 	{"contact", "/contact", "GET", 200},
-	// {"mr", "/make-reservation", "GET", []postData{}, 200},
-	// {"post-search-avail", "/search-availability", "POST", []postData{
-	// 	{key: "start", value: "16-07-2002"},
-	// 	{key: "end", value: "2020-01-02"},
-	// }, 200},
-	// {"post-search-avail-json", "/search-availability-json", "POST", []postData{
-	// 	{key: "start", value: "16-07-2002"},
-	// 	{key: "end", value: "2020-01-02"},
-	// }, 200},
-	// {"post-make-reservation", "/make-reservation", "POST", []postData{
-	// 	{key: "first_name", value: "Bruce"},
-	// 	{key: "last_name", value: "Wayne"},
-	// 	{key: "email", value: "bwayne@batman.loc"},
-	// 	{key: "phone", value: "999-999-9999"},
-	// }, 200},
+	{"non-existent", "/ooga-booga", "GET", http.StatusNotFound},
+	{"login", "/login", "GET", http.StatusOK},
+	{"logout", "/logout", "GET", http.StatusOK},
+	{"dashboard", "/admin/dashboard", "GET", http.StatusOK},
+	{"new-res", "/admin/reservations-new", "GET", http.StatusOK},
+	{"all-res", "/admin/reservations-all", "GET", http.StatusOK},
+	{"show-res", "/admin/reservations/new/1/show", "GET", http.StatusOK},
 }
 
 func TestHandlers(t *testing.T) {
@@ -51,574 +43,844 @@ func TestHandlers(t *testing.T) {
 	ts := httptest.NewTLSServer(routes)
 	defer ts.Close()
 
-	for _, test := range theTests {
-		response, err := ts.Client().Get(ts.URL + test.url)
+	for _, e := range theTests {
+		response, err := ts.Client().Get(ts.URL + e.url)
 		if err != nil {
 			t.Log(err)
 			t.Fatal()
 		}
 
-		if response.StatusCode != test.expectedStatusCode {
-			t.Errorf("For %s, expected status %d but got status %d", test.name, test.expectedStatusCode, response.StatusCode)
+		if response.StatusCode != e.expectedStatusCode {
+			t.Errorf("For %s, expected status %d but got status %d", e.name, e.expectedStatusCode, response.StatusCode)
 		}
 	}
 }
 
-func TestRepository_Reservation(t *testing.T) {
-	reservation := models.Reservation{
-		RoomID: 1,
-		Room: models.Room{
-			ID:       1,
-			RoomName: "General's Quarters",
+var reservationTests = []struct {
+	name               string
+	reservation        models.Reservation
+	expectedStatusCode int
+	expectedHTML       string
+	expectedLocation   string
+}{
+	{
+		name: "reservation-in-session",
+		reservation: models.Reservation{
+			RoomID: 1,
+			Room: models.Room{
+				ID:       1,
+				RoomName: "General's Quarters",
+			},
 		},
-	}
-
-	req, _ := http.NewRequest("GET", "/make-reservation", nil)
-	ctx := getCtx(req)
-	req = req.WithContext(ctx)
-
-	rr := httptest.NewRecorder()
-
-	session.Put(ctx, "reservation", reservation)
-
-	handler := http.HandlerFunc(Repo.Reservation)
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Errorf("Reservation handlers returned wrong response code: got %d, wanted %d", rr.Code, http.StatusOK)
-	}
-
-	//test case where reservation is not in session
-	req, _ = http.NewRequest("GET", "/make-reservation", nil)
-	ctx = getCtx(req)
-	req = req.WithContext(ctx)
-	rr = httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusTemporaryRedirect {
-		t.Errorf("Reservation handlers returned wrong response code: got %d, wanted %d", rr.Code, http.StatusTemporaryRedirect)
-	}
-
-	//test case where room does not exist
-	req, _ = http.NewRequest("GET", "/make-reservation", nil)
-	ctx = getCtx(req)
-	req = req.WithContext(ctx)
-	rr = httptest.NewRecorder()
-
-	reservation.RoomID = 100
-
-	session.Put(ctx, "reservation", reservation)
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusTemporaryRedirect {
-		t.Errorf("Reservation handlers returned wrong response code: got %d, wanted %d", rr.Code, http.StatusTemporaryRedirect)
-	}
-}
-
-func TestRepository_PostReservation(t *testing.T) {
-	postData := url.Values{}
-	postData.Add("start_date", "01-01-2050")
-	postData.Add("end_date", "01-02-2050")
-	postData.Add("first_name", "Joseph")
-	postData.Add("last_name", "Clyde")
-	postData.Add("email", "jclyde@bookings.loc")
-	postData.Add("phone", "123123123")
-	postData.Add("room_id", "1")
-
-	req, _ := http.NewRequest("POST", "/make-reservation", strings.NewReader(postData.Encode()))
-	ctx := getCtx(req)
-	req = req.WithContext(ctx)
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr := httptest.NewRecorder()
-
-	handler := http.HandlerFunc(Repo.PostReservation)
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusSeeOther {
-		t.Errorf("PostReservation handlers returned wrong response code: got %d, wanted %d", rr.Code, http.StatusSeeOther)
-	}
-
-	//test for missing post body
-	req, _ = http.NewRequest("POST", "/make-reservation", nil)
-	ctx = getCtx(req)
-	req = req.WithContext(ctx)
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr = httptest.NewRecorder()
-
-	handler = http.HandlerFunc(Repo.PostReservation)
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusTemporaryRedirect {
-		t.Errorf("PostReservation handlers returned wrong response code for missing post body: got %d, wanted %d", rr.Code, http.StatusTemporaryRedirect)
-	}
-
-	//test for invalid start date
-	postData = url.Values{}
-	postData.Add("start_date", "invalid")
-	postData.Add("end_date", "01-02-2050")
-	postData.Add("first_name", "Joseph")
-	postData.Add("last_name", "Clyde")
-	postData.Add("email", "jclyde@bookings.loc")
-	postData.Add("phone", "123123123")
-	postData.Add("room_id", "1")
-
-	req, _ = http.NewRequest("POST", "/make-reservation", strings.NewReader(postData.Encode()))
-	ctx = getCtx(req)
-	req = req.WithContext(ctx)
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr = httptest.NewRecorder()
-
-	handler = http.HandlerFunc(Repo.PostReservation)
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusTemporaryRedirect {
-		t.Errorf("PostReservation handlers returned wrong response code for invalid start date: got %d, wanted %d", rr.Code, http.StatusTemporaryRedirect)
-	}
-
-	//test for invalid end date
-	postData = url.Values{}
-	postData.Add("start_date", "01-02-2050")
-	postData.Add("end_date", "invalid")
-	postData.Add("first_name", "Joseph")
-	postData.Add("last_name", "Clyde")
-	postData.Add("email", "jclyde@bookings.loc")
-	postData.Add("phone", "123123123")
-	postData.Add("room_id", "1")
-
-	req, _ = http.NewRequest("POST", "/make-reservation", strings.NewReader(postData.Encode()))
-	ctx = getCtx(req)
-	req = req.WithContext(ctx)
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr = httptest.NewRecorder()
-
-	handler = http.HandlerFunc(Repo.PostReservation)
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusTemporaryRedirect {
-		t.Errorf("PostReservation handlers returned wrong response code for invalid end date: got %d, wanted %d", rr.Code, http.StatusTemporaryRedirect)
-	}
-
-	//test for invalid room id
-	postData = url.Values{}
-	postData.Add("start_date", "01-02-2050")
-	postData.Add("end_date", "01-02-2050")
-	postData.Add("first_name", "Joseph")
-	postData.Add("last_name", "Clyde")
-	postData.Add("email", "jclyde@bookings.loc")
-	postData.Add("phone", "123123123")
-	postData.Add("room_id", "invalid")
-
-	req, _ = http.NewRequest("POST", "/make-reservation", strings.NewReader(postData.Encode()))
-	ctx = getCtx(req)
-	req = req.WithContext(ctx)
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr = httptest.NewRecorder()
-
-	handler = http.HandlerFunc(Repo.PostReservation)
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusTemporaryRedirect {
-		t.Errorf("PostReservation handlers returned wrong response code for invalid room id: got %d, wanted %d", rr.Code, http.StatusTemporaryRedirect)
-	}
-
-	//test for invalid data
-	postData = url.Values{}
-	postData.Add("start_date", "01-02-2050")
-	postData.Add("end_date", "01-02-2050")
-	postData.Add("first_name", "J")
-	postData.Add("last_name", "Clyde")
-	postData.Add("email", "jclyde@bookings.loc")
-	postData.Add("phone", "123123123")
-	postData.Add("room_id", "1")
-
-	req, _ = http.NewRequest("POST", "/make-reservation", strings.NewReader(postData.Encode()))
-	ctx = getCtx(req)
-	req = req.WithContext(ctx)
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr = httptest.NewRecorder()
-
-	handler = http.HandlerFunc(Repo.PostReservation)
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusSeeOther {
-		t.Errorf("PostReservation handlers returned wrong response code for invalid data: got %d, wanted %d", rr.Code, http.StatusSeeOther)
-	}
-
-	//test for failure to insert reservation into database
-	postData = url.Values{}
-	postData.Add("start_date", "01-02-2050")
-	postData.Add("end_date", "01-02-2050")
-	postData.Add("first_name", "Joseph")
-	postData.Add("last_name", "Clyde")
-	postData.Add("email", "jclyde@bookings.loc")
-	postData.Add("phone", "123123123")
-	postData.Add("room_id", "2")
-
-	req, _ = http.NewRequest("POST", "/make-reservation", strings.NewReader(postData.Encode()))
-	ctx = getCtx(req)
-	req = req.WithContext(ctx)
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr = httptest.NewRecorder()
-
-	handler = http.HandlerFunc(Repo.PostReservation)
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusTemporaryRedirect {
-		t.Errorf("PostReservation handler failed to fail inserting reservation: got %d, wanted %d", rr.Code, http.StatusTemporaryRedirect)
-	}
-
-	//test for failure to insert room restriction into database
-	postData = url.Values{}
-	postData.Add("start_date", "01-02-2050")
-	postData.Add("end_date", "01-02-2050")
-	postData.Add("first_name", "Joseph")
-	postData.Add("last_name", "Clyde")
-	postData.Add("email", "jclyde@bookings.loc")
-	postData.Add("phone", "123123123")
-	postData.Add("room_id", "1000")
-
-	req, _ = http.NewRequest("POST", "/make-reservation", strings.NewReader(postData.Encode()))
-	ctx = getCtx(req)
-	req = req.WithContext(ctx)
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr = httptest.NewRecorder()
-
-	handler = http.HandlerFunc(Repo.PostReservation)
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusTemporaryRedirect {
-		t.Errorf("PostReservation handler failed to fail inserting reservation: got %d, wanted %d", rr.Code, http.StatusTemporaryRedirect)
-	}
-}
-
-func TestRepository_PostAvailability(t *testing.T) {
-	postData := url.Values{}
-	postData.Add("start", "01-01-2050")
-	postData.Add("end", "01-02-2050")
-
-	req, _ := http.NewRequest("POST", "/post-availability", strings.NewReader(postData.Encode()))
-
-	ctx := getCtx(req)
-
-	req = req.WithContext(ctx)
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr := httptest.NewRecorder()
-
-	handler := http.HandlerFunc(Repo.PostAvailability)
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Errorf("Got wrong status code: got %d, wanted %d", rr.Code, http.StatusOK)
-	}
-
-	//test case where body is null
-	req, _ = http.NewRequest("POST", "/post-availability", nil)
-
-	ctx = getCtx(req)
-
-	req = req.WithContext(ctx)
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr = httptest.NewRecorder()
-
-	handler = http.HandlerFunc(Repo.PostAvailability)
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusTemporaryRedirect {
-		t.Errorf("Got wrong status code: got %d, wanted %d", rr.Code, http.StatusTemporaryRedirect)
-	}
-
-	//test case where start date is invalid
-	postData = url.Values{}
-	postData.Add("start", "")
-	postData.Add("end", "01-02-2050")
-
-	req, _ = http.NewRequest("POST", "/post-availability", strings.NewReader(postData.Encode()))
-
-	ctx = getCtx(req)
-
-	req = req.WithContext(ctx)
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr = httptest.NewRecorder()
-
-	handler = http.HandlerFunc(Repo.PostAvailability)
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusTemporaryRedirect {
-		t.Errorf("Got wrong status code: got %d, wanted %d", rr.Code, http.StatusTemporaryRedirect)
-	}
-
-	//test case where end date is invalid
-	postData = url.Values{}
-	postData.Add("start", "01-01-2050")
-	postData.Add("end", "")
-
-	req, _ = http.NewRequest("POST", "/post-availability", strings.NewReader(postData.Encode()))
-
-	ctx = getCtx(req)
-
-	req = req.WithContext(ctx)
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr = httptest.NewRecorder()
-
-	handler = http.HandlerFunc(Repo.PostAvailability)
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusTemporaryRedirect {
-		t.Errorf("Got wrong status code: got %d, wanted %d", rr.Code, http.StatusTemporaryRedirect)
-	}
-
-	//test case where error occurs checking room availability
-	postData = url.Values{}
-	postData.Add("start", "01-01-3000")
-	postData.Add("end", "01-02-2050")
-
-	req, _ = http.NewRequest("POST", "/post-availability", strings.NewReader(postData.Encode()))
-
-	ctx = getCtx(req)
-
-	req = req.WithContext(ctx)
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr = httptest.NewRecorder()
-
-	handler = http.HandlerFunc(Repo.PostAvailability)
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusTemporaryRedirect {
-		t.Errorf("Got wrong status code: got %d, wanted %d", rr.Code, http.StatusTemporaryRedirect)
-	}
-
-	//test case where no rooms are available
-	postData = url.Values{}
-	postData.Add("start", "01-01-2050")
-	postData.Add("end", "01-01-2100")
-
-	req, _ = http.NewRequest("POST", "/post-availability", strings.NewReader(postData.Encode()))
-
-	ctx = getCtx(req)
-
-	req = req.WithContext(ctx)
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr = httptest.NewRecorder()
-
-	handler = http.HandlerFunc(Repo.PostAvailability)
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusSeeOther {
-		t.Errorf("Got wrong status code: got %d, wanted %d", rr.Code, http.StatusSeeOther)
-	}
-}
-
-func TestRepository_ReservationSummary(t *testing.T) {
-	req, _ := http.NewRequest("GET", "/reservation-summary", nil)
-
-	ctx := getCtx(req)
-	req = req.WithContext(ctx)
-
-	handler := http.HandlerFunc(Repo.ReservationSummary)
-
-	reservation := models.Reservation{
-		ID:     1,
-		RoomID: 1,
-		Room: models.Room{
-			ID:       1,
-			RoomName: "General's Quarters",
+		expectedStatusCode: http.StatusOK,
+		expectedHTML:       `action="/make-reservation"`,
+	},
+	{
+		name:               "reservation-not-in-session",
+		reservation:        models.Reservation{},
+		expectedStatusCode: http.StatusSeeOther,
+		expectedHTML:       "",
+		expectedLocation:   "/",
+	},
+	{
+		name: "non-existent-room",
+		reservation: models.Reservation{
+			RoomID: 2,
+			Room: models.Room{
+				ID:       2,
+				RoomName: "Non-existent room",
+			},
 		},
-	}
+		expectedStatusCode: http.StatusSeeOther,
+		expectedHTML:       "",
+		expectedLocation:   "/",
+	},
+}
 
-	session.Put(ctx, "reservation", reservation)
+func TestReservation(t *testing.T) {
+	for _, test := range reservationTests {
+		req, _ := http.NewRequest("GET", "/make-reservation", nil)
+		ctx := getCtx(req)
+		req = req.WithContext(ctx)
 
-	rr := httptest.NewRecorder()
+		rr := httptest.NewRecorder()
 
-	handler.ServeHTTP(rr, req)
+		if test.reservation.RoomID > 0 {
+			session.Put(ctx, "reservation", test.reservation)
+		}
 
-	if rr.Code != http.StatusOK {
-		t.Errorf("Wrong status code: expected %d, got %d", http.StatusOK, rr.Code)
-	}
+		handler := http.HandlerFunc(Repo.Reservation)
 
-	//test case where can't get reservation out of session
-	req, _ = http.NewRequest("GET", "/reservation-summary", nil)
+		handler.ServeHTTP(rr, req)
 
-	ctx = getCtx(req)
-	req = req.WithContext(ctx)
+		if rr.Code != test.expectedStatusCode {
+			t.Errorf("failed %s: expected status %d, got status %d", test.name, test.expectedStatusCode, rr.Code)
+		}
 
-	handler = http.HandlerFunc(Repo.ReservationSummary)
+		if test.expectedHTML != "" {
+			html := rr.Body.String()
+			if !strings.Contains(html, test.expectedHTML) {
+				t.Errorf("failed %s: expected to find %s, but didn't", test.name, test.expectedHTML)
+			}
+		}
 
-	rr = httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusTemporaryRedirect {
-		t.Errorf("Wrong status code: expected %d, got %d", http.StatusTemporaryRedirect, rr.Code)
+		if test.expectedLocation != "" {
+			actualLoc, _ := rr.Result().Location()
+			if actualLoc.String() != test.expectedLocation {
+				t.Errorf("failed %s: expected location %s, got location %s", test.name, test.expectedLocation, actualLoc.String())
+			}
+		}
 	}
 }
 
-func TestRepository_ChooseRoom(t *testing.T) {
-	req, _ := http.NewRequest("GET", "/choose-room/1", nil)
-
-	ctx := getCtx(req)
-	req = req.WithContext(ctx)
-
-	req.RequestURI = "/choose-room/1"
-
-	reservation := models.Reservation{
-		RoomID: 1,
-		Room: models.Room{
-			ID:       1,
-			RoomName: "General's Quarters",
+var postReservationTests = []struct {
+	name               string
+	postData           url.Values
+	expectedStatusCode int
+	expectedLocation   string
+	expectedHTML       string
+}{
+	{
+		name: "valid-post",
+		postData: url.Values{
+			"start_date": {"01-01-2050"},
+			"end_date":   {"01-02-2050"},
+			"first_name": {"Joseph"},
+			"last_name":  {"Clyde"},
+			"email":      {"jclyde@bookings.loc"},
+			"phone":      {"123123123"},
+			"room_id":    {"1"},
 		},
-	}
-
-	session.Put(ctx, "reservation", reservation)
-
-	handler := http.HandlerFunc(Repo.ChooseRoom)
-
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusSeeOther {
-		t.Errorf("Wrong status code: expected %d, got %d", http.StatusSeeOther, rr.Code)
-	}
-
-	//test case where room id is invalid
-	req, _ = http.NewRequest("GET", "/choose-room/invalid", nil)
-
-	ctx = getCtx(req)
-	req = req.WithContext(ctx)
-
-	req.RequestURI = "/choose-room/invalid"
-
-	reservation = models.Reservation{
-		RoomID: 1,
-		Room: models.Room{
-			ID:       1,
-			RoomName: "General's Quarters",
+		expectedStatusCode: http.StatusOK,
+		expectedLocation:   "/reservation-summary",
+	},
+	{
+		name:               "missing-post-body",
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/",
+	},
+	{
+		name: "invalid-start-date",
+		postData: url.Values{
+			"start_date": {"invalid"},
+			"end_date":   {"01-02-2050"},
+			"first_name": {"Joseph"},
+			"last_name":  {"Clyde"},
+			"email":      {"jclyde@bookings.loc"},
+			"phone":      {"123123123"},
+			"room_id":    {"1"},
 		},
-	}
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/",
+	},
+	{
+		name: "invalid-end-date",
+		postData: url.Values{
+			"start_date": {"01-01-2050"},
+			"end_date":   {"invalid"},
+			"first_name": {"Joseph"},
+			"last_name":  {"Clyde"},
+			"email":      {"jclyde@bookings.loc"},
+			"phone":      {"123123123"},
+			"room_id":    {"1"},
+		},
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/",
+	},
+	{
+		name: "invalid-room-id",
+		postData: url.Values{
+			"start_date": {"01-01-2050"},
+			"end_date":   {"01-02-2050"},
+			"first_name": {"Joseph"},
+			"last_name":  {"Clyde"},
+			"email":      {"jclyde@bookings.loc"},
+			"phone":      {"123123123"},
+			"room_id":    {"invalid"},
+		},
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/",
+	},
+	{
+		name: "non-existent-room",
+		postData: url.Values{
+			"start_date": {"01-01-2050"},
+			"end_date":   {"01-02-2050"},
+			"first_name": {"Joseph"},
+			"last_name":  {"Clyde"},
+			"email":      {"jclyde@bookings.loc"},
+			"phone":      {"123123123"},
+			"room_id":    {"2"},
+		},
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/",
+	},
+	{
+		name: "invalid-data",
+		postData: url.Values{
+			"start_date": {"01-01-2050"},
+			"end_date":   {"01-02-2050"},
+			"first_name": {"J"},
+			"last_name":  {"Clyde"},
+			"email":      {"jclyde@bookings.loc"},
+			"phone":      {"123123123"},
+			"room_id":    {"1"},
+		},
+		expectedStatusCode: http.StatusOK,
+		expectedHTML:       `action="/make-reservation"`,
+	},
+	{
+		name: "failed-to-insert-reservation",
+		postData: url.Values{
+			"start_date": {"01-01-2050"},
+			"end_date":   {"01-02-2050"},
+			"first_name": {"Joseph"},
+			"last_name":  {"Clyde"},
+			"email":      {"jclyde@bookings.loc"},
+			"phone":      {"123123123"},
+			"room_id":    {"3"},
+		},
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/",
+	},
+	{
+		name: "failed-to-insert-room-restriction",
+		postData: url.Values{
+			"start_date": {"01-01-2050"},
+			"end_date":   {"01-02-2050"},
+			"first_name": {"Joseph"},
+			"last_name":  {"Clyde"},
+			"email":      {"jclyde@bookings.loc"},
+			"phone":      {"123123123"},
+			"room_id":    {"1000"},
+		},
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/",
+	},
+}
 
-	session.Put(ctx, "reservation", reservation)
+func TestPostReservation(t *testing.T) {
+	for _, test := range postReservationTests {
+		var req *http.Request
 
-	handler = http.HandlerFunc(Repo.ChooseRoom)
+		if test.postData != nil {
+			req, _ = http.NewRequest("POST", "/make-reservation", strings.NewReader(test.postData.Encode()))
+		} else {
+			req, _ = http.NewRequest("POST", "/make-reservation", nil)
+		}
 
-	rr = httptest.NewRecorder()
+		ctx := getCtx(req)
+		req = req.WithContext(ctx)
 
-	handler.ServeHTTP(rr, req)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	if rr.Code != http.StatusTemporaryRedirect {
-		t.Errorf("Wrong status code: expected %d, got %d", http.StatusTemporaryRedirect, rr.Code)
-	}
+		rr := httptest.NewRecorder()
 
-	//test case where reservation is not in session
-	req, _ = http.NewRequest("GET", "/choose-room/1", nil)
+		handler := http.HandlerFunc(Repo.PostReservation)
 
-	ctx = getCtx(req)
-	req = req.WithContext(ctx)
+		handler.ServeHTTP(rr, req)
 
-	req.RequestURI = "/choose-room/1"
+		if rr.Code != test.expectedStatusCode {
+			t.Errorf("failed %s: expected status %d, got status %d", test.name, test.expectedStatusCode, rr.Code)
+		}
 
-	handler = http.HandlerFunc(Repo.ChooseRoom)
+		if test.expectedHTML != "" {
+			html := rr.Body.String()
+			if !strings.Contains(html, test.expectedHTML) {
+				t.Errorf("failed %s: expected to find %s, but didn't", test.name, test.expectedHTML)
+			}
+		}
 
-	rr = httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusTemporaryRedirect {
-		t.Errorf("Wrong status code: expected %d, got %d", http.StatusTemporaryRedirect, rr.Code)
+		if test.expectedLocation != "" {
+			actualLoc, _ := rr.Result().Location()
+			if actualLoc.String() != test.expectedLocation {
+				t.Errorf("failed %s: expected location %s, but got %s", test.name, test.expectedLocation, actualLoc.String())
+			}
+		}
 	}
 }
 
-func TestRepository_BookRoom(t *testing.T) {
-	req, _ := http.NewRequest("GET", "/book-room?s=01-01-2050&e=01-02-2050&id=1", nil)
+var postAvailabilityTests = []struct {
+	name               string
+	postData           url.Values
+	expectedStatusCode int
+	expectedLocation   string
+}{
+	{
+		name: "valid-post",
+		postData: url.Values{
+			"start": {"01-01-2050"},
+			"end":   {"01-02-2050"},
+		},
+		expectedStatusCode: http.StatusOK,
+	},
+	{
+		name:               "missing-post-data",
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/",
+	},
+	{
+		name: "invalid-start-date",
+		postData: url.Values{
+			"start": {""},
+			"end":   {"01-02-2050"},
+		},
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/",
+	},
+	{
+		name: "invalid-end-date",
+		postData: url.Values{
+			"start": {"01-01-2050"},
+			"end":   {""},
+		},
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/",
+	},
+	{
+		name: "error-searching-availability",
+		postData: url.Values{
+			"start": {"01-01-3000"},
+			"end":   {"01-02-2050"},
+		},
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/",
+	},
+	{
+		name: "error-searching-availability",
+		postData: url.Values{
+			"start": {"01-01-3000"},
+			"end":   {"01-02-2050"},
+		},
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/",
+	},
+	{
+		name: "rooms-not-available",
+		postData: url.Values{
+			"start": {"01-01-2050"},
+			"end":   {"01-01-2100"},
+		},
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/search-availability",
+	},
+}
 
-	ctx := getCtx(req)
-	req = req.WithContext(ctx)
+func TestPostAvailability(t *testing.T) {
+	for _, e := range postAvailabilityTests {
+		var req *http.Request
 
-	reservation := models.Reservation{
-		ID: 1,
-	}
+		if e.postData != nil {
+			req, _ = http.NewRequest("POST", "/post-availability", strings.NewReader(e.postData.Encode()))
+		} else {
+			req, _ = http.NewRequest("POST", "/post-availability", nil)
+		}
 
-	session.Put(ctx, "reservation", reservation)
+		ctx := getCtx(req)
+		req = req.WithContext(ctx)
 
-	rr := httptest.NewRecorder()
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	handler := http.HandlerFunc(Repo.BookRoom)
+		rr := httptest.NewRecorder()
 
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusSeeOther {
-		t.Errorf("Wrong status: expected %d, got %d", http.StatusSeeOther, rr.Code)
-	}
+		handler := http.HandlerFunc(Repo.PostAvailability)
 
-	//test case where url query is invalid
-	req, _ = http.NewRequest("GET", "/book-room", nil)
+		handler.ServeHTTP(rr, req)
 
-	ctx = getCtx(req)
-	req = req.WithContext(ctx)
+		if rr.Code != e.expectedStatusCode {
+			t.Errorf("failed %s: expected status %d, got status %d", e.name, e.expectedStatusCode, rr.Code)
+		}
 
-	reservation = models.Reservation{
-		ID: 1,
-	}
-
-	session.Put(ctx, "reservation", reservation)
-
-	rr = httptest.NewRecorder()
-
-	handler = http.HandlerFunc(Repo.BookRoom)
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusTemporaryRedirect {
-		t.Errorf("Wrong status: expected %d, got %d", http.StatusTemporaryRedirect, rr.Code)
-	}
-
-	//test case where can't get room from database
-	req, _ = http.NewRequest("GET", "/book-room?s=01-01-2050&e=01-02-2050&id=100", nil)
-
-	ctx = getCtx(req)
-	req = req.WithContext(ctx)
-
-	reservation = models.Reservation{
-		ID: 1,
-	}
-
-	session.Put(ctx, "reservation", reservation)
-
-	rr = httptest.NewRecorder()
-
-	handler = http.HandlerFunc(Repo.BookRoom)
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusTemporaryRedirect {
-		t.Errorf("Wrong status: expected %d, got %d", http.StatusTemporaryRedirect, rr.Code)
+		if e.expectedLocation != "" {
+			actualLoc, _ := rr.Result().Location()
+			if actualLoc.String() != e.expectedLocation {
+				t.Errorf("failed %s: expected location %s, but got %s", e.name, e.expectedLocation, actualLoc.String())
+			}
+		}
 	}
 }
+
+var reservationSummaryTests = []struct {
+	name               string
+	reservation        models.Reservation
+	expectedStatusCode int
+	expectedLocation   string
+}{
+	{
+		name: "reservation-in-session",
+		reservation: models.Reservation{
+			ID:     1,
+			RoomID: 1,
+			Room: models.Room{
+				ID:       1,
+				RoomName: "General's Quarters",
+			},
+		},
+		expectedStatusCode: http.StatusOK,
+	},
+	{
+		name:               "reservation-not-in-session",
+		reservation:        models.Reservation{},
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/",
+	},
+}
+
+func TestReservationSummary(t *testing.T) {
+	for _, e := range reservationSummaryTests {
+		req, _ := http.NewRequest("GET", "/reservation-summary", nil)
+
+		ctx := getCtx(req)
+		req = req.WithContext(ctx)
+
+		handler := http.HandlerFunc(Repo.ReservationSummary)
+
+		if e.reservation.RoomID > 0 {
+			session.Put(ctx, "reservation", e.reservation)
+		}
+
+		rr := httptest.NewRecorder()
+
+		handler.ServeHTTP(rr, req)
+
+		if rr.Code != e.expectedStatusCode {
+			t.Errorf("failed %s: expected status %d, got status %d", e.name, e.expectedStatusCode, rr.Code)
+		}
+
+		if e.expectedLocation != "" {
+			actualLoc, _ := rr.Result().Location()
+			if actualLoc.String() != e.expectedLocation {
+				t.Errorf("failed %s: expected location %s, but got %s", e.name, e.expectedLocation, actualLoc.String())
+			}
+		}
+	}
+}
+
+var chooseRoomTests = []struct {
+	name               string
+	reservation        models.Reservation
+	url                string
+	expectedStatusCode int
+	expectedLocation   string
+}{
+	{
+		name: "valid-reservation-in-session",
+		reservation: models.Reservation{
+			ID:     1,
+			RoomID: 1,
+			Room: models.Room{
+				ID:       1,
+				RoomName: "General's Quarters",
+			},
+		},
+		url:                "/choose-room/1",
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/make-reservation",
+	},
+	{
+		name: "invalid-room-id-url",
+		reservation: models.Reservation{
+			ID:     1,
+			RoomID: 1,
+			Room: models.Room{
+				ID:       1,
+				RoomName: "General's Quarters",
+			},
+		},
+		url:                "/choose-room/invalid",
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/",
+	},
+	{
+		name:               "reservation-not-in-session",
+		reservation:        models.Reservation{},
+		url:                "/choose-room/1",
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/",
+	},
+}
+
+func TestChooseRoom(t *testing.T) {
+	for _, e := range chooseRoomTests {
+		req, _ := http.NewRequest("GET", e.url, nil)
+
+		ctx := getCtx(req)
+		req = req.WithContext(ctx)
+
+		req.RequestURI = e.url
+
+		if e.reservation.RoomID > 0 {
+			session.Put(ctx, "reservation", e.reservation)
+		}
+
+		handler := http.HandlerFunc(Repo.ChooseRoom)
+
+		rr := httptest.NewRecorder()
+
+		handler.ServeHTTP(rr, req)
+
+		if rr.Code != e.expectedStatusCode {
+			t.Errorf("failed %s: expected status %d, got status %d", e.name, e.expectedStatusCode, rr.Code)
+		}
+
+		if e.expectedLocation != "" {
+			actualLoc, _ := rr.Result().Location()
+			if actualLoc.String() != e.expectedLocation {
+				t.Errorf("failed %s: expected location %s, but got %s", e.name, e.expectedLocation, actualLoc.String())
+			}
+		}
+	}
+}
+
+var bookRoomTests = []struct {
+	name               string
+	urlQuery           string
+	reservation        models.Reservation
+	expectedStatusCode int
+	expectedLocation   string
+}{
+	{
+		name:               "success-booking-room",
+		urlQuery:           "/book-room?s=01-01-2050&e=01-02-2050&id=1",
+		reservation:        models.Reservation{},
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/make-reservation",
+	},
+	{
+		name:               "invalid-url-query",
+		urlQuery:           "/book-room",
+		reservation:        models.Reservation{},
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/",
+	},
+	{
+		name:               "invalid-room-id",
+		urlQuery:           "/book-room?s=01-01-2050&e=01-02-2050&id=2",
+		reservation:        models.Reservation{},
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/",
+	},
+}
+
+func TestBookRoom(t *testing.T) {
+	for _, e := range bookRoomTests {
+		req, _ := http.NewRequest("GET", e.urlQuery, nil)
+
+		ctx := getCtx(req)
+		req = req.WithContext(ctx)
+
+		session.Put(ctx, "reservation", e.reservation)
+
+		rr := httptest.NewRecorder()
+
+		handler := http.HandlerFunc(Repo.BookRoom)
+
+		handler.ServeHTTP(rr, req)
+
+		if rr.Code != e.expectedStatusCode {
+			t.Errorf("failed %s: expected %d, got %d", e.name, e.expectedStatusCode, rr.Code)
+		}
+
+		if e.expectedLocation != "" {
+			actualLoc, _ := rr.Result().Location()
+			if actualLoc.String() != e.expectedLocation {
+				t.Errorf("failed %s: expected location %s, but got %s", e.name, e.expectedLocation, actualLoc.String())
+			}
+		}
+	}
+}
+
+var loginTests = []struct {
+	name               string
+	email              string
+	expectedStatusCode int
+	expectedHTML       string
+	expectedLocation   string
+}{
+	{
+		"valid-credentials",
+		"test@test.loc",
+		http.StatusSeeOther,
+		"",
+		"/",
+	},
+	{
+		"invalid-credentials",
+		"invalid@invalid.loc",
+		http.StatusSeeOther,
+		"",
+		"/login",
+	},
+	{
+		"invalid-data",
+		"invalid",
+		http.StatusOK,
+		`action="/login"`,
+		"",
+	},
+}
+
+func TestLogin(t *testing.T) {
+	for _, test := range loginTests {
+		postedData := url.Values{}
+		postedData.Add("email", test.email)
+		postedData.Add("password", "password")
+
+		req, _ := http.NewRequest("POST", "/user/login", strings.NewReader(postedData.Encode()))
+
+		ctx := getCtx(req)
+		req = req.WithContext(ctx)
+
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		rr := httptest.NewRecorder()
+
+		handler := http.HandlerFunc(Repo.PostShowLogin)
+
+		handler.ServeHTTP(rr, req)
+
+		if rr.Code != test.expectedStatusCode {
+			t.Errorf("failed %s: expected code %d, but got %d", test.name, test.expectedStatusCode, rr.Code)
+		}
+
+		if test.expectedLocation != "" {
+			actualLocation, _ := rr.Result().Location()
+			if actualLocation.String() != test.expectedLocation {
+				t.Errorf("failed %s: expected location %s, but got location %s", test.name, test.expectedLocation, actualLocation.String())
+			}
+		}
+
+		if test.expectedHTML != "" {
+			html := rr.Body.String()
+			if !strings.Contains(html, test.expectedHTML) {
+				t.Errorf("failed %s: expected to find %s but did not", test.name, test.expectedHTML)
+			}
+		}
+	}
+}
+
+var adminResCalendarTests = []struct {
+	name               string
+	urlQuery           string
+	expectedStatusCode int
+	expectedHTML       string
+}{
+	{
+		name:               "valid-url-query",
+		urlQuery:           "/admin/reservations-calendar?y=2021&m=5",
+		expectedStatusCode: http.StatusOK,
+		expectedHTML:       `action="/admin/reservations-calendar"`,
+	},
+}
+
+func TestAdminReservationsCalendar(t *testing.T) {
+	for _, e := range adminResCalendarTests {
+		req, _ := http.NewRequest("GET", e.urlQuery, nil)
+
+		ctx := getCtx(req)
+		req = req.WithContext(ctx)
+
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		handler := http.HandlerFunc(Repo.AdminReservationsCalendar)
+
+		rr := httptest.NewRecorder()
+
+		handler.ServeHTTP(rr, req)
+
+		if rr.Code != e.expectedStatusCode {
+			t.Errorf("failed %s: expected status %d, got status %d", e.name, e.expectedStatusCode, rr.Code)
+		}
+
+		if e.expectedHTML != "" {
+			html := rr.Body.String()
+			if !strings.Contains(html, e.expectedHTML) {
+				t.Errorf("failed %s: expected to find %s, but didn't", e.name, e.expectedHTML)
+			}
+		}
+	}
+}
+
+var adminPostShowReservationTests = []struct {
+	name               string
+	uri                string
+	postData           url.Values
+	expectedStatusCode int
+	expectedLocation   string
+}{
+	{
+		name: "valid-post-from-res-calendar",
+		uri:  "/admin/reservations/cal/1/show",
+		postData: url.Values{
+			"first_name": {"Joseph"},
+			"last_name":  {"Clyde"},
+			"email":      {"joseph@clyde.com"},
+			"phone":      {"1234567890"},
+			"month":      {"7"},
+			"year":       {"2002"},
+		},
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/admin/reservations-calendar?y=2002&m=7",
+	},
+	{
+		name: "valid-post-from-other-src",
+		uri:  "/admin/reservations/all/1/show",
+		postData: url.Values{
+			"first_name": {"Joseph"},
+			"last_name":  {"Clyde"},
+			"email":      {"joseph@clyde.com"},
+			"phone":      {"1234567890"},
+		},
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/admin/reservations-all",
+	},
+}
+
+func TestAdminPostShowReservation(t *testing.T) {
+	for _, e := range adminPostShowReservationTests {
+		var req *http.Request
+
+		if e.postData != nil {
+			req, _ = http.NewRequest("POST", "/login", strings.NewReader(e.postData.Encode()))
+		} else {
+			req, _ = http.NewRequest("POST", "/login", nil)
+		}
+
+		ctx := getCtx(req)
+		req = req.WithContext(ctx)
+
+		req.RequestURI = e.uri
+
+		handler := http.HandlerFunc(Repo.AdminPostShowReservation)
+
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		rr := httptest.NewRecorder()
+
+		handler.ServeHTTP(rr, req)
+
+		if rr.Code != e.expectedStatusCode {
+			t.Errorf("failed %s: expected status %d, got status %d", e.name, e.expectedStatusCode, rr.Code)
+		}
+
+		if e.expectedLocation != "" {
+			actualLoc, _ := rr.Result().Location()
+			if actualLoc.String() != e.expectedLocation {
+				t.Errorf("failed %s: expected location %s, got location %s", e.name, e.expectedLocation, actualLoc.String())
+			}
+		}
+	}
+}
+
+var adminPostReservationsCalendarTests = []struct {
+	name               string
+	uri                string
+	postData           url.Values
+	expectedStatusCode int
+	expectedLocation   string
+}{
+	{
+		name: "valid-post",
+		uri:  "/admin/reservations-calendar?y=2030&m=7",
+		postData: url.Values{
+			"add_block_2_7-25-2030":    {"1"},
+			"remove_block_1_7-20-2030": {"1"},
+			"m":                        {"7"},
+			"y":                        {"2030"},
+		},
+		expectedStatusCode: http.StatusSeeOther,
+		expectedLocation:   "/admin/reservations-calendar?y=2030&m=7",
+	},
+}
+
+func TestAdminPostReservationsCalendar(t *testing.T) {
+	for _, e := range adminPostReservationsCalendarTests {
+		var req *http.Request
+
+		if e.postData != nil {
+			req, _ = http.NewRequest("POST", "/admin/reservations-calendar", strings.NewReader(e.postData.Encode()))
+		} else {
+			req, _ = http.NewRequest("POST", "/admin/reservations-calendar", nil)
+		}
+
+		ctx := getCtx(req)
+		req = req.WithContext(ctx)
+
+		blockMap := make(map[string]int)
+		blockMap["7-30-2030"] = 1
+		blockMap["7-20-2030"] = 1
+
+		session.Put(ctx, "block_map_1", blockMap)
+
+		req.RequestURI = e.uri
+
+		handler := http.HandlerFunc(Repo.AdminPostReservationsCalendar)
+
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		rr := httptest.NewRecorder()
+
+		handler.ServeHTTP(rr, req)
+
+		if rr.Code != e.expectedStatusCode {
+			t.Errorf("failed %s: expected status %d, got status %d", e.name, e.expectedStatusCode, rr.Code)
+		}
+
+		if e.expectedLocation != "" {
+			actualLoc, _ := rr.Result().Location()
+			if actualLoc.String() != e.expectedLocation {
+				t.Errorf("failed %s: expected location %s, got location %s", e.name, e.expectedLocation, actualLoc.String())
+			}
+		}
+	}
+}
+
+// var adminProcessResTests = []struct {
+// 	name               string
+// 	query              string
+// 	expectedStatusCode int
+// 	expectedLocation   string
+// }{
+// 	{
+// 		name:               "process-res-from-cal",
+// 		query:              "?y=2050&m=7",
+// 		expectedStatusCode: http.StatusSeeOther,
+// 		expectedLocation:   "/admin/reservations-calendar?y=2050&m=7",
+// 	},
+// 	{
+// 		name:               "process-res-from-other-src",
+// 		query:              "",
+// 		expectedStatusCode: http.StatusSeeOther,
+// 		expectedLocation:   "/admin/reservations-new",
+// 	},
+// }
+
+// func TestAdminProcessReservation(t *testing.T) {
+// 	for _, e := range adminProcessResTests {
+// 		req, _ := http.NewRequest("GET", fmt.Sprintf("/admin/process-reservation/cal/1/do%s", e.query), nil)
+
+// 		ctx := getCtx(req)
+// 		req = req.WithContext(ctx)
+
+// 		handler := http.HandlerFunc(Repo.AdminProcessReservation)
+
+// 		rr := httptest.NewRecorder()
+
+// 		handler.ServeHTTP(rr, req)
+
+// 		if rr.Code != e.expectedStatusCode {
+// 			t.Errorf("failed %s: expected status %d, got status %d", e.name, e.expectedStatusCode, rr.Code)
+// 		}
+
+// 		if e.expectedLocation != "" {
+// 			actualLoc, _ := rr.Result().Location()
+
+// 			if actualLoc.String() != e.expectedLocation {
+// 				t.Errorf("failed %s: expected location %s, got location %s", e.name, e.expectedLocation, actualLoc.String())
+// 			}
+// 		}
+// 	}
+// }
 
 func getCtx(req *http.Request) context.Context {
 	ctx, err := session.Load(req.Context(), req.Header.Get("X-Session"))
